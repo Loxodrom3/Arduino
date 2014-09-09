@@ -1,0 +1,166 @@
+/*
+Jon Proctor  phototopo.com
+send readings form analog inputs to NeoPixel
+Using 2 potentiomiters, and 1 photoresistor
+*/
+
+// From adafruit Libraries
+// IMPORTANT: To reduce NeoPixel burnout risk, add 1000 uF capacitor across
+// pixel power leads, add 300 - 500 Ohm resistor on first pixel's data input
+// and minimize distance between Arduino and first pixel.  Avoid connecting
+// on a live circuit...if you must, connect GND first.
+
+#include <Adafruit_NeoPixel.h>
+#define PIN 11
+#define NUMLED 30  //number of LED in the strip
+#define MaxLED 16  //Maximum brightness (I often set iti to 64 or 32 when testing at my desk, becasue the LEDs are so bright
+#define WAIT 300   //value for Delay at end of loop to control speed of color propagation
+
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(NUMLED, PIN, NEO_GRB + NEO_KHZ800);  //Library from adafruit.com
+ 
+int pin0 = 0;   //potentiometer for Red
+int pin1 = 1;   //potentiometer for Green
+int pin2 = 2;   //photo resistor for Blue
+
+int ledRed = 6;  //used for the Red LED
+int ledGrn = 5;  //used for the Green LED
+int ledBlu = 3;  //used for the Blue LED
+
+long arrayC [NUMLED];  // array for holding the color value for each of the LED addresses.  
+ 
+void setup() {
+  Serial.begin(9600);  // useing serial print for DEBUGGING.  Can be commented out if debugging not needed
+  strip.begin();       //
+  strip.show();        // Initialize all pixels to 'off'
+}
+ 
+void loop() 
+{   // read values From inputs; constrain and remap as necessary
+    int reading0  = analogRead(pin0);
+    int val0 = map (reading0, 0, 1023, MaxLED, 0);   //re-map the vlaues of 0 - 1023 to MaxLED to 0.  Note: the max may be set to 128 or 64 if too bright
+    int reading1  = analogRead(pin1);
+    int val1 = map (reading1, 0, 1023, MaxLED, 0);   //re-map the vlaues of 0 - 1023 to MaxLED to 0
+    int reading2  = analogRead(pin2);
+    reading2 = constrain (reading2, 100, 800);       //constrain the photoresistor to a range for 100 to 800
+    int val2 = map (reading2, 100, 800, 0, MaxLED);  //re-map the vlaues of 100 - 370 to MaxLED to 0.  
+    // end reading values section
+    
+    // calculate the color value for neopixel
+    long c =  ((val0*65536)+(val1*256)+(val2));      //setting c to the Color value to be sent to NeoPixel
+    
+    // Update array.  First, move the value in each index down the array 
+    // using a for loop from NUMLED to 0 with steps of -i.
+    // Then assign c to index [0]
+    for (int i = NUMLED; i > 0; i--){    //i loop for array updte
+      // Serial.print(i);                //DEBUG to determine the correct value for i>0
+      arrayC[i] = arrayC[i-1];
+    } // end i array update
+
+    arrayC [0] = c;                      // set index[0] to color c
+    
+    for (int i = 0; i < NUMLED; i++){    //i loop for filling strip with color c from arrayC
+      strip.setPixelColor (i, arrayC[i]);
+    }
+    
+    strip.show();
+    //DEBUG Serial.print(val0); Serial.print(", "); Serial.print(val1); Serial.print(", "); Serial.print(val2); Serial.print(", "); Serial.println (c);
+    //DEGUB Serial.print(arrayC[0]); Serial.print(", ");Serial.print(arrayC[1]); Serial.print(", ");Serial.print(arrayC[2]); Serial.print(", ");Serial.print(arrayC[3]); Serial.print(", ");Serial.println(arrayC[4]);
+    delay(WAIT);
+  
+  analogWrite (ledRed, val0);  // write to the LEDs on the board.  
+  analogWrite (ledGrn, val1);
+  analogWrite (ledBlu, val2);
+
+}
+
+//below here be the code from adafruit strandtest
+//-----------------------------------------------
+// Fill the dots one after the other with a color
+void colorWipe(uint32_t c, uint8_t wait) {
+  for(uint16_t i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, c);
+      strip.show();
+      
+      Serial.print (i);
+      Serial.print (", ");
+      Serial.println(c);
+      
+      delay(wait);
+  }
+}
+
+void rainbow(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256; j++) {
+    for(i=0; i<strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel((i+j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+// Slightly different, this makes the rainbow equally distributed throughout
+void rainbowCycle(uint8_t wait) {
+  uint16_t i, j;
+
+  for(j=0; j<256*5; j++) { // 5 cycles of all colors on wheel
+    for(i=0; i< strip.numPixels(); i++) {
+      strip.setPixelColor(i, Wheel(((i * 256 / strip.numPixels()) + j) & 255));
+    }
+    strip.show();
+    delay(wait);
+  }
+}
+
+//Theatre-style crawling lights.
+void theaterChase(uint32_t c, uint8_t wait) {
+  for (int j=0; j<10; j++) {  //do 10 cycles of chasing
+    for (int q=0; q < 5; q++) {
+      for (int i=0; i < strip.numPixels(); i=i+5) {
+        strip.setPixelColor(i+q, c);    //turn every third pixel on
+      }
+      strip.show();
+     
+      delay(wait);
+     
+      for (int i=0; i < strip.numPixels(); i=i+3) {
+        strip.setPixelColor(i+q, 0);        //turn every third pixel off
+      }
+    }
+  }
+}
+
+//Theatre-style crawling lights with rainbow effect
+void theaterChaseRainbow(uint8_t wait) {
+  for (int j=0; j < 256; j++) {     // cycle all 256 colors in the wheel
+    for (int q=0; q < 3; q++) {
+        for (int i=0; i < strip.numPixels(); i=i+3) {
+          strip.setPixelColor(i+q, Wheel( (i+j) % 255));    //turn every third pixel on
+        }
+        strip.show();
+       
+        delay(wait);
+       
+        for (int i=0; i < strip.numPixels(); i=i+3) {
+          strip.setPixelColor(i+q, 0);        //turn every third pixel off
+        }
+    }
+  }
+}
+
+// Input a value 0 to 255 to get a color value.
+// The colours are a transition r - g - b - back to r.
+uint32_t Wheel(byte WheelPos) {
+  if(WheelPos < 85) {
+   return strip.Color(WheelPos * 3, 255 - WheelPos * 3, 0);
+  } else if(WheelPos < 170) {
+   WheelPos -= 85;
+   return strip.Color(255 - WheelPos * 3, 0, WheelPos * 3);
+  } else {
+   WheelPos -= 170;
+   return strip.Color(0, WheelPos * 3, 255 - WheelPos * 3);
+  }
+}
+
